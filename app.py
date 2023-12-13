@@ -1,9 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, jsonify
-from datetime import datetime, date, timedelta
+from flask import Flask, render_template, request, jsonify
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-import pandas as pd
 from openai import OpenAI
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -12,18 +10,16 @@ load_dotenv()
 
 from supabase import create_client, Client
 
+# Initialize Supabase Client
 key = os.environ.get('SUPABASE_KEY')
 url = os.environ.get('SUPABASE_URL')
 supabase: Client = create_client(url, key)
 
+# Initialize OpenAI Client
 opeani_key = url = os.environ.get('OPENAI_KEY')
 client = OpenAI(api_key=opeani_key)
 
 app = Flask(__name__)
-
-@app.context_processor
-def inject_current_datetime():
-    return dict(current_datetime=datetime.utcnow())
 
 def calculate_similarity(embedding, embeddings_list):
     similarities = cosine_similarity(embedding, embeddings_list)
@@ -40,9 +36,10 @@ def get_similar_ids():
         input=inputed_text,
         model="text-embedding-ada-002"
     )
-
+    # Convert embedding to numpy array
     embedding = np.array(response.data[0].embedding).reshape(1, -1)
 
+    
     data = supabase.table("embeddings").select("id, embedding").execute().data
     db_embeddings = [convert_embedding(row['embedding']) for row in data]
     ids = [row['id'] for row in data]
@@ -60,6 +57,7 @@ def index():
 @app.route('/search_companies', methods=['GET', 'POST'])
 def search_companies():
     if request.method == 'POST':
+        # Get user input (text to vectorize and search)
         inputed_text = request.form['inputed_text']
 
         # Get embeddings from OpenAI
@@ -67,6 +65,7 @@ def search_companies():
             input=inputed_text,
             model="text-embedding-ada-002"
         )
+        # Convert embedding to numpy array
         embedding = np.array(response.data[0].embedding).reshape(1, -1)
 
         # Get embeddings from Supabase
